@@ -34,6 +34,7 @@ Global $aIniHeaderMain = " --------------- " & StringUpper($aUtilName) & " -----
 Global $aIniEntriesCountLine = "Number of programs (If changed, util will restart and new custom entries will be added)"
 Global $aIniRequireTaskKillLine = "Require task kill to exit / cancel this utility? (yes/no)"
 Global $aIniWaitForInternetLine = "Wait for internet connection before starting first program? (yes/no)"
+Global $aIniMaxWaitTimeLine = "Maximum time to wait for internet before starting programs even if no internet (seconds, 0 to wait infinitely)"
 Global $aIniShowStatusWindowLine = "Show status window? (yes/no)"
 Global $iIniEntriesChanged = False
 
@@ -49,12 +50,18 @@ If $aShowStatusWindowYN = "yes" Then Global $aSplashStartUp = SplashTextOn($aUti
 If $aWaitForInternetYN = "yes" Then
 	LogWrite("Waiting for internet connection.")
 	Local $i = 0
+	Local $aStopLoop = False
 	Do
 		$i += 1
 		ControlSetText($aSplashStartUp, "", "Static1", $aStartText & "Waiting for internet connection." & @CRLF & $i)
 		Sleep(1000)
-	Until _IsInternetConnected()
-	LogWrite("Internet connected.")
+		If $aMaxWaitTime > 0 Then
+			If $i = $aMaxWaitTime Then $aStopLoop = True
+		EndIf
+		$aIsInternetConnected = _IsInternetConnected()
+	Until $aStopLoop Or $aIsInternetConnected
+	If $aIsInternetConnected Then LogWrite("Internet connected after " & $i & " seconds.")
+	If $aStopLoop Then LogWrite("NOTICE! Internet did not connect within " & $aMaxWaitTime & " seconds.")
 EndIf
 
 For $x = 0 To ($aEntriesCount - 1)
@@ -79,7 +86,7 @@ EndIf
 Func NoIniExist()
 	Local $aWidth = 400
 	Local $aHeight = 150
-	Local $aTotalQuestionCount = 4
+	Local $aTotalQuestionCount = 5
 	Local $i = 0
 	$i += 1
 	Global $aEntriesCount = InputBox("Welcome to " & $aUtilName, "Question " & $i & " of " & $aTotalQuestionCount & @CRLF & "Please enter the number of programs you wish to start with this utility:", "2", "", $aWidth, $aHeight)
@@ -90,6 +97,9 @@ Func NoIniExist()
 	$i += 1
 	Global $aRequireTaskKillYN = InputBox("Welcome to " & $aUtilName, "Question " & $i & " of " & $aTotalQuestionCount & @CRLF & $aIniWaitForInternetLine, "no", "", $aWidth, $aHeight)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniWaitForInternetLine, $aRequireTaskKillYN)
+	$i += 1
+	Global $aMaxWaitTime = InputBox("Welcome to " & $aUtilName, "Question " & $i & " of " & $aTotalQuestionCount & @CRLF & $aIniMaxWaitTimeLine, "120", "", $aWidth, $aHeight)
+	IniWrite($aIniFile, $aIniHeaderMain, $aIniMaxWaitTimeLine, $aMaxWaitTime)
 	$i += 1
 	Global $aShowStatusWindowYN = InputBox("Welcome to " & $aUtilName, "Question " & $i & " of " & $aTotalQuestionCount & @CRLF & $aIniShowStatusWindowLine, "yes", "", $aWidth, $aHeight)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniShowStatusWindowLine, $aShowStatusWindowYN)
@@ -111,6 +121,7 @@ Func ReadUini()
 	Global $aRequireTaskKillYN = IniRead($aIniFile, $aIniHeaderMain, $aIniRequireTaskKillLine, $iniCheck)
 	Global $aEntriesCount = IniRead($aIniFile, $aIniHeaderMain, $aIniEntriesCountLine, $iniCheck)
 	Global $aWaitForInternetYN = IniRead($aIniFile, $aIniHeaderMain, $aIniWaitForInternetLine, $iniCheck)
+	Global $aMaxWaitTime = IniRead($aIniFile, $aIniHeaderMain, $aIniMaxWaitTimeLine, $iniCheck)
 	Global $aShowStatusWindowYN = IniRead($aIniFile, $aIniHeaderMain, $aIniShowStatusWindowLine, $iniCheck)
 	Global $xDelay[$aEntriesCount], $xFile[$aEntriesCount]
 	For $i = 0 To ($aEntriesCount - 1)
@@ -145,6 +156,11 @@ Func ReadUini()
 		$aWaitForInternetYN = "no"
 		$iIniFail += 1
 		$iIniError = $iIniError & "WaitForInternetYN, "
+	EndIf
+	If $iniCheck = $aMaxWaitTime Then
+		$aMaxWaitTime = "120"
+		$iIniFail += 1
+		$iIniError = $iIniError & "MaxWaitTime, "
 	EndIf
 	If $iniCheck = $aShowStatusWindowYN Then
 		$aShowStatusWindowYN = "yes"
@@ -229,6 +245,7 @@ Func UpdateIni($aMakeBackupTF = True)
 	FileWriteLine($aIniFile, "[" & $aIniHeaderMain & "]")
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniRequireTaskKillLine, $aRequireTaskKillYN)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniWaitForInternetLine, $aWaitForInternetYN)
+	IniWrite($aIniFile, $aIniHeaderMain, $aIniMaxWaitTimeLine, $aMaxWaitTime)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniShowStatusWindowLine, $aShowStatusWindowYN)
 	FileWriteLine($aIniFile, @CRLF)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniEntriesCountLine, $aEntriesCount)
