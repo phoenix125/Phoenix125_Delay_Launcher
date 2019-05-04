@@ -6,9 +6,9 @@
 #AutoIt3Wrapper_UseX64=n
 #AutoIt3Wrapper_Res_Comment=By Phoenix125
 #AutoIt3Wrapper_Res_Description=Phoenix125_Delay_Launcher
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.0
+#AutoIt3Wrapper_Res_Fileversion=1.1.0.0
 #AutoIt3Wrapper_Res_ProductName=AtlasServerUpdateUtility
-#AutoIt3Wrapper_Res_ProductVersion=v1.0.0
+#AutoIt3Wrapper_Res_ProductVersion=v1.1.0
 #AutoIt3Wrapper_Res_CompanyName=http://www.Phoenix125.com
 #AutoIt3Wrapper_Res_LegalCopyright=http://www.Phoenix125.com
 #AutoIt3Wrapper_Run_AU3Check=n
@@ -27,7 +27,7 @@
 #include <WindowsConstants.au3>
 
 Global $aUtilName = "Phoenix125_Delay_Launcher"
-Global $aUtilityVer = "v1.0.0"
+Global $aUtilityVer = "v1.1.0"
 Global $aLogFile = $aUtilName & ".log"
 Global $aIniFile = @ScriptDir & "\" & $aUtilName & ".ini"
 Global $aIniHeaderMain = " --------------- " & StringUpper($aUtilName) & " --------------- "
@@ -36,10 +36,12 @@ Global $aIniRequireTaskKillLine = "Require task kill to exit / cancel this utili
 Global $aIniWaitForInternetLine = "Wait for internet connection before starting first program? (yes/no)"
 Global $aIniMaxWaitTimeLine = "Maximum time to wait for internet before starting programs even if no internet (seconds, 0 to wait infinitely)"
 Global $aIniShowStatusWindowLine = "Show status window? (yes/no)"
+Global $aIniCheckForRedisLine = "Keep reruning first program every 10 seconds until Redis-Server is confirmed to be running? (yes/no)"
+Global $aIniSystemUse = "System use only. Do not change"
 Global $iIniEntriesChanged = False
 
-LogWrite("---------------- " & $aUtilName & " Started ---------------- ")
-If Not FileExists($aIniFile) Then NoIniExist()
+LogWrite("---------------- " & $aUtilName & " Started ----------------")
+If Not FileExists($aIniFile) Then NoIniExist(True)
 LogWrite("Reading Ini file.")
 ReadUini()
 If $aRequireTaskKillYN = "yes" Then Opt("TrayMenuMode", 1)
@@ -54,10 +56,10 @@ If $aWaitForInternetYN = "yes" Then
 	Do
 		$i += 1
 		ControlSetText($aSplashStartUp, "", "Static1", $aStartText & "Waiting for internet connection." & @CRLF & $i)
-		Sleep(1000)
 		If $aMaxWaitTime > 0 Then
 			If $i = $aMaxWaitTime Then $aStopLoop = True
 		EndIf
+		Sleep(1000)
 		$aIsInternetConnected = _IsInternetConnected()
 	Until $aStopLoop Or $aIsInternetConnected
 	If $aIsInternetConnected Then LogWrite("Internet connected after " & $i & " seconds.")
@@ -83,7 +85,7 @@ If $aShowStatusWindowYN = "yes" Then
 	SplashOff()
 EndIf
 
-Func NoIniExist()
+Func NoIniExist($tRestart = True)
 	Local $aWidth = 400
 	Local $aHeight = 150
 	Local $aTotalQuestionCount = 5
@@ -104,7 +106,7 @@ Func NoIniExist()
 	Global $aShowStatusWindowYN = InputBox("Welcome to " & $aUtilName, "Question " & $i & " of " & $aTotalQuestionCount & @CRLF & $aIniShowStatusWindowLine, "yes", "", $aWidth, $aHeight)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniShowStatusWindowLine, $aShowStatusWindowYN)
 	MsgBox($MB_OK, $aUtilName, "Restarting to implement changes.", 2)
-	_RestartProgram()
+	If $tRestart Then _RestartProgram()
 EndFunc   ;==>NoIniExist
 
 Func ReadUini()
@@ -123,12 +125,12 @@ Func ReadUini()
 	Global $aWaitForInternetYN = IniRead($aIniFile, $aIniHeaderMain, $aIniWaitForInternetLine, $iniCheck)
 	Global $aMaxWaitTime = IniRead($aIniFile, $aIniHeaderMain, $aIniMaxWaitTimeLine, $iniCheck)
 	Global $aShowStatusWindowYN = IniRead($aIniFile, $aIniHeaderMain, $aIniShowStatusWindowLine, $iniCheck)
+	Global $aShowConfigTF = IniRead($aIniFile, $aIniHeaderMain, $aIniSystemUse, $iniCheck)
 	Global $xDelay[$aEntriesCount], $xFile[$aEntriesCount]
 	For $i = 0 To ($aEntriesCount - 1)
 		$xDelay[$i] = IniRead($aIniFile, $aIniHeaderMain, ($i + 1) & "-Delay (seconds) ###", $iniCheck)
 		$xFile[$i] = IniRead($aIniFile, $aIniHeaderMain, ($i + 1) & "-File ###", $iniCheck)
 	Next
-
 	If $iniCheck = $aEntriesCount Then
 		$aEntriesCount = "1"
 		$iIniFail += 1
@@ -167,11 +169,16 @@ Func ReadUini()
 		$iIniFail += 1
 		$iIniError = $iIniError & "ShowStatusWindowYN, "
 	EndIf
+	If $iniCheck = $aShowConfigTF Then
+		$aShowConfigTF = True
+		$iIniFail += 1
+		$iIniError = $iIniError & "ShowConfigTF, "
+	EndIf
 	If $iIniEntriesChanged Then
 		MsgBox($MB_OK, $aUtilName, "The number of entries changed. Restarting . . .", 3)
+		IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, False)
 		_RestartProgram()
 	EndIf
-
 	If $iIniFail > 0 Then
 		IniFileFail()
 		Local $tIniFail = True
@@ -180,6 +187,11 @@ EndFunc   ;==>ReadUini
 
 Func IniFileFail()
 	UpdateIni(False)
+	MsgBox($MB_OK, $aUtilName, "Config file changed. Restarting setup wizard.")
+	If $aShowConfigTF Then
+		IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, True)
+		NoIniExist(False)
+	EndIf
 	Local $aWidth = 400
 	Local $aHeight = 165
 	For $i = 0 To ($aEntriesCount - 1)
@@ -213,7 +225,6 @@ Func IniFileFail()
 			EndSwitch
 			Sleep(50)
 		Until $aDone = True
-;~ 		$xFile[$i] = InputBox($aUtilName, "Entry " & ($i + 1) & " of " & $aEntriesCount & @CRLF & "File to execute:", $xFile[$i], "", $aWidth, $aHeight)
 		IniWrite($aIniFile, $aIniHeaderMain, ($i + 1) & "-File ###", $xFile[$i])
 		$xDelay[$i] = InputBox($aUtilName, "Entry " & ($i + 1) & " of " & $aEntriesCount & @CRLF & "Delay before executing " & @CRLF & $xFile[$i], $xDelay[$i], "", $aWidth, $aHeight)
 		IniWrite($aIniFile, $aIniHeaderMain, ($i + 1) & "-Delay (seconds) ###", $xDelay[$i])
@@ -247,6 +258,7 @@ Func UpdateIni($aMakeBackupTF = True)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniWaitForInternetLine, $aWaitForInternetYN)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniMaxWaitTimeLine, $aMaxWaitTime)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniShowStatusWindowLine, $aShowStatusWindowYN)
+	IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, $aShowConfigTF)
 	FileWriteLine($aIniFile, @CRLF)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniEntriesCountLine, $aEntriesCount)
 	FileWriteLine($aIniFile, @CRLF)
