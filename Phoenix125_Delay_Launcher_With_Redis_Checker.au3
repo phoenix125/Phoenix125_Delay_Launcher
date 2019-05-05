@@ -129,6 +129,7 @@ Func NoIniExist($tRestart = True)
 	Global $aCheckForRedisYN = InputBox("Welcome to " & $aUtilName, "Question " & $i & " of " & $aTotalQuestionCount & @CRLF & $aIniCheckForRedisLine, "no", "", $aWidth, $aHeight)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniCheckForRedisLine, $aCheckForRedisYN)
 	MsgBox($MB_OK, $aUtilName, "Restarting to implement changes.", 2)
+	IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, "no")
 	If $tRestart Then _RestartProgram()
 EndFunc   ;==>NoIniExist
 
@@ -149,7 +150,7 @@ Func ReadUini()
 	Global $aMaxWaitTime = IniRead($aIniFile, $aIniHeaderMain, $aIniMaxWaitTimeLine, $iniCheck)
 	Global $aShowStatusWindowYN = IniRead($aIniFile, $aIniHeaderMain, $aIniShowStatusWindowLine, $iniCheck)
 	Global $aCheckForRedisYN = IniRead($aIniFile, $aIniHeaderMain, $aIniCheckForRedisLine, $iniCheck)
-	Global $aShowConfigTF = IniRead($aIniFile, $aIniHeaderMain, $aIniSystemUse, $iniCheck)
+	Global $aShowConfigYN = IniRead($aIniFile, $aIniHeaderMain, $aIniSystemUse, $iniCheck)
 	Global $xDelay[$aEntriesCount], $xFile[$aEntriesCount]
 	For $i = 0 To ($aEntriesCount - 1)
 		$xDelay[$i] = IniRead($aIniFile, $aIniHeaderMain, ($i + 1) & "-Delay (seconds) ###", $iniCheck)
@@ -198,14 +199,14 @@ Func ReadUini()
 		$iIniFail += 1
 		$iIniError = $iIniError & "CheckForRedisYN, "
 	EndIf
-	If $iniCheck = $aShowConfigTF Then
-		$aShowConfigTF = True
+	If $iniCheck = $aShowConfigYN Then
+		$aShowConfigYN = "yes"
 		$iIniFail += 1
 		$iIniError = $iIniError & "ShowConfigTF, "
 	EndIf
 	If $iIniEntriesChanged Then
 		MsgBox($MB_OK, $aUtilName, "The number of entries changed. Restarting . . .", 3)
-		IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, False)
+		IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, "no")
 		_RestartProgram()
 	EndIf
 	If $iIniFail > 0 Then
@@ -216,9 +217,9 @@ EndFunc   ;==>ReadUini
 
 Func IniFileFail()
 	UpdateIni(False)
-	MsgBox($MB_OK, $aUtilName, "Config file changed. Restarting setup wizard.")
-	If $aShowConfigTF Then
-		IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, True)
+	If $aShowConfigYN = "yes" Then
+		MsgBox($MB_OK, $aUtilName, "Config file changed. Running setup wizard.")
+		IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, "yes")
 		NoIniExist(False)
 	EndIf
 	Local $aWidth = 400
@@ -288,7 +289,7 @@ Func UpdateIni($aMakeBackupTF = True)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniMaxWaitTimeLine, $aMaxWaitTime)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniShowStatusWindowLine, $aShowStatusWindowYN)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniCheckForRedisLine, $aCheckForRedisYN)
-	IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, $aShowConfigTF)
+	IniWrite($aIniFile, $aIniHeaderMain, $aIniSystemUse, $aShowConfigYN)
 	FileWriteLine($aIniFile, @CRLF)
 	IniWrite($aIniFile, $aIniHeaderMain, $aIniEntriesCountLine, $aEntriesCount)
 	FileWriteLine($aIniFile, @CRLF)
